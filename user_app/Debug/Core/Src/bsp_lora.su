@@ -13,7 +13,11 @@
 ../Core/Src/bsp_lora.c:165:5:bsp_lora_get_node_send_packet_index	24	static
 ../Core/Src/bsp_lora.c:173:5:bsp_lora_check_cmd_in_node_send_packets	24	static
 ../Core/Src/bsp_lora.c:181:6:bsp_lora_remove_packet_from_node_send_packets	24	static
-../Core/Src/bsp_lora.c:191:6:bsp_lora_send_packet_to_node	64	static
-../Core/Src/bsp_lora.c:233:6:bsp_lora_resend_packet	48	static
-../Core/Src/bsp_lora.c:275:13:bsp_lora_handle_payload	16	static
-../Core/Src/bsp_lora.c:283:6:bsp_lora_receive_packet	216	static
+../Core/Src/bsp_lora.c:188:5:bsp_lora_get_node_receive_packet_index	24	static
+../Core/Src/bsp_lora.c:196:5:bsp_lora_get_id_in_node_receive_packets	24	static
+../Core/Src/bsp_lora.c:204:5:bsp_lora_check_cmd_in_node_receive_packets	24	static
+../Core/Src/bsp_lora.c:212:6:bsp_lora_remove_packet_from_node_receive_packets	24	static
+../Core/Src/bsp_lora.c:222:6:bsp_lora_send_packet_to_node	64	static
+../Core/Src/bsp_lora.c:264:6:bsp_lora_resend_packet	48	static
+../Core/Src/bsp_lora.c:306:13:bsp_lora_handle_payload	16	static
+../Core/Src/bsp_lora.c:314:6:bsp_lora_receive_packet	216	static

@@ -38,6 +38,26 @@ enum pc_cmd{
 	PC_CMD_CONNECT_TO_SPECIFIC_NODE,
 	PC_CMD_DISCONNECT_TO_ALL_NODES,
 	PC_CMD_DISCONNECT_TO_SPECIFIC_NODE,
+	PC_CMD_INITIALISE_NODE_QUANTITY,
+};
+
+/* the data frame between stm32 and esp32:
+	| length | cmd	  | node's id | connection status(1 byte), transfer status(1 byte), machine status(1 byte), 5 byte reserved, 32 byte data |
+	| 1 byte | 1 byte |  1 byte   |                                     40 byte                                                               |
+
+special case:
+ */
+ typedef struct uart_data_frame_s{
+	uint8_t len;
+	uint8_t cmd;
+	uint8_t node_id;
+	uint8_t raw_data[40];
+ }uart_data_frame_t;
+
+enum uart_cmd{
+	UART_CMD_INITIALISE_NODE_QUANTITY = 0,
+	UART_CMD_HANDLE_DATA_READ_FROM_NODE,
+	UART_CMD_HANDLE_WARNING_NODE,
 };
 
 enum lora_network_work_status{
@@ -67,7 +87,6 @@ enum software_timer_id{
 	SW_TIMER_SEND_REQUEST,
 	SW_TIMER_SEND_DATA,
 };
-
 
 typedef struct connection_task_notification_value_s{
 	connection_task_notification_cmd_t cmd;

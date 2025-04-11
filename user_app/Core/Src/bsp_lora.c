@@ -223,13 +223,13 @@ void bsp_lora_send_packet_to_node(lora_node_t *des_node, uint8_t cmd, uint32_t m
 	if(bsp_lora_check_cmd_in_node_send_packets(des_node, cmd) == -1){
 		if(cmd == LORA_CMD_CONNECT){
 			if(des_node->connected == 0){
-				HAL_UART_Transmit(&huart2, "connecting\n", 12, 2000);
+				HAL_UART_Transmit(&huart2, (uint8_t *)"connecting\n", 12, 2000);
 				bsp_lora_send_packet(GATEWAY_ID, des_node->id, ((lora_send_packet_buffer.packet_id + 1) % (MAX_PACKET_ID + 1)) + 1
 								, LORA_CMD_CONNECT, 0, NULL, 0, 3);
-				HAL_UART_Transmit(&huart2, "sendcn\n", 7, 2000);
+				HAL_UART_Transmit(&huart2, (uint8_t *)"sendcn\n", 7, 2000);
 			}
 			else{
-				HAL_UART_Transmit(&huart2, "Node is connected\n", 19, 2000);
+				HAL_UART_Transmit(&huart2, (uint8_t *)"Node is connected\n", 19, 2000);
 			}
 		}
 
@@ -244,7 +244,7 @@ void bsp_lora_send_packet_to_node(lora_node_t *des_node, uint8_t cmd, uint32_t m
 		}
 
 		else{
-			HAL_UART_Transmit(&huart2, "read request\n", 13, 2000);
+			HAL_UART_Transmit(&huart2, (uint8_t *)"read request\n", 13, 2000);
 			bsp_lora_send_packet(GATEWAY_ID, des_node->id, ((lora_send_packet_buffer.packet_id + 1) % (MAX_PACKET_ID + 1)) + 1,
 					cmd, mem_addr, data, len, ttl);
 		}

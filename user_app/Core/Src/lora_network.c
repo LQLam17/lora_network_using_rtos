@@ -113,6 +113,7 @@ void lora_network_disconnect_to_all_nodes_task(void *param){
 
 	while(1){
 		if(xQueueReceive(all_disconnect_queue, &NotificationValue, portMAX_DELAY)){
+			/* get spi key and enter to safe mode to avoid the situation when lora's data's conflicted */
 			xSemaphoreTake(spi_mutex, portMAX_DELAY);
 			bsp_lora_enter_safe_mode();
 			lora_network_send_request_stop_scheduler();
@@ -132,7 +133,7 @@ void lora_network_disconnect_to_all_nodes_task(void *param){
 			}
 
 
-			/* connect to specific device here */
+			/* disconnect to specific device here */
 			else if(NotificationValue.cmd == STOP_SPECIFIC){
 				HAL_UART_Transmit(&huart2, "Stop specific\n", 16, 2000);
 				for(int i = 0; i < lr_nw_node_quantity; i++){
@@ -155,10 +156,10 @@ void lora_network_disconnect_to_all_nodes_task(void *param){
 				}
 			}
 
-			/* when receive ack cmd from the node that the gw is requesting to connect to */
+			/* when receive ack cmd from the node that the gw is requesting to disconnect to */
 			else if(NotificationValue.cmd == ACK){
 				uint8_t buf[30];
-				sprintf(buf, "disconnect to node %d\n", lr_nw_node_index1 + 1);
+				sprintf(buf, "Disconnect to node %d\n", lr_nw_node_index1 + 1);
 				HAL_UART_Transmit(&huart2, buf, strlen(buf), 2000);
 
 				int packet_index = bsp_lora_check_cmd_in_node_send_packets(&NODE_DEVICE[lr_nw_node_index1], LORA_CMD_DISCONNECT);
@@ -172,14 +173,13 @@ void lora_network_disconnect_to_all_nodes_task(void *param){
 					}while(NODE_DEVICE[lr_nw_node_index1].connected == 0 && lr_nw_node_index1 < lr_nw_node_quantity);
 
 					if(lr_nw_node_index1 < lr_nw_node_quantity && NODE_DEVICE[lr_nw_node_index1].connected == 1){
-						HAL_UART_Transmit(&huart2, "ack notify\n", 11, 2000);
+						HAL_UART_Transmit(&huart2, "Disconnect sucessfully\n", 23, 2000);
 						bsp_lora_send_packet_to_node(&NODE_DEVICE[lr_nw_node_index1], LORA_CMD_DISCONNECT, 0, 0, 0, 3);
 						xTimerStart(all_disconnect_timer, 0);
 					}
 				}
 				else if(lr_nw_disconnect_mode == LORA_DISCONNECT_MODE_SPECIFIC){
 					lr_nw_node_index1 = 0;
-
 					taskENTER_CRITICAL();
 					lr_nw_disconnect_mode = LORA_STATUS_IDLE;
 					taskEXIT_CRITICAL();
@@ -188,7 +188,7 @@ void lora_network_disconnect_to_all_nodes_task(void *param){
 
 			/* receive nak or timeout */
 			else if(NotificationValue.cmd == NAK || NotificationValue.cmd == TIMEOUT){
-				HAL_UART_Transmit(&huart2, "timeout\n", 8, 2000);
+				HAL_UART_Transmit(&huart2, "Timeout\n", 8, 2000);
 				int packet_index = bsp_lora_check_cmd_in_node_send_packets(&NODE_DEVICE[lr_nw_node_index1], LORA_CMD_DISCONNECT);
 				if(packet_index != -1){
 					if(NODE_DEVICE[lr_nw_node_index1].last_lora_send_packet[packet_index].ttl > 0){
@@ -233,10 +233,12 @@ void lora_network_disconnect_to_all_nodes_task(void *param){
 				taskEXIT_CRITICAL();
 
 			}
-			STM_LOG("node device: %d\n", lr_nw_node_index1 + 1, 14);
+			//STM_LOG("node device: %d\n", lr_nw_node_index1 + 1, 14);
 			if(lr_nw_disconnect_mode == LORA_STATUS_IDLE){
 				lora_network_send_request_setup_scheduler();
 			}
+
+			/* exit safe mode */
 			bsp_lora_exit_safe_mode();
 			xSemaphoreGive(spi_mutex);
 		}
@@ -252,6 +254,7 @@ void lora_network_connect_to_all_nodes_task(void *param){
 
 	while(1){
 		if(xQueueReceive(all_connect_queue, &NotificationValue, portMAX_DELAY)){
+			/* get spi key and enter to safe mode to avoid the situation when lora's data's conflicted */
 			xSemaphoreTake(spi_mutex, portMAX_DELAY);
 			bsp_lora_enter_safe_mode();
 			lora_network_send_request_stop_scheduler();
@@ -294,9 +297,7 @@ void lora_network_connect_to_all_nodes_task(void *param){
 
 			/* when receive ack cmd from the node that the gw is requesting to connect to */
 			else if(NotificationValue.cmd == ACK){
-				uint8_t buf[30];
-				sprintf(buf, "Connect to node %d", lr_nw_node_index + 1);
-				HAL_UART_Transmit(&huart2, buf, strlen(buf), 2000);
+				STM_LOG("Connect to node %2d\n", lr_nw_node_index + 1, );
 				int packet_index = bsp_lora_check_cmd_in_node_send_packets(&NODE_DEVICE[lr_nw_node_index], LORA_CMD_CONNECT);
 				if(packet_index != -1){
 					bsp_lora_remove_packet_from_node_send_packets(&NODE_DEVICE[lr_nw_node_index], packet_index);
@@ -308,7 +309,7 @@ void lora_network_connect_to_all_nodes_task(void *param){
 					}while(NODE_DEVICE[lr_nw_node_index].connected == 1 && lr_nw_node_index < lr_nw_node_quantity);
 
 					if(lr_nw_node_index < lr_nw_node_quantity && NODE_DEVICE[lr_nw_node_index].connected == 0){
-						HAL_UART_Transmit(&huart2, "ack notify\n", 11, 2000);
+						HAL_UART_Transmit(&huart2, "Connect sucessfully\n", 20, 2000);
 						bsp_lora_send_packet_to_node(&NODE_DEVICE[lr_nw_node_index], LORA_CMD_CONNECT, 0, NULL, 0, 3);
 						xTimerStart(all_connect_timer, 0);
 					}
@@ -325,7 +326,7 @@ void lora_network_connect_to_all_nodes_task(void *param){
 
 			/* receive nak or timeout */
 			else if(NotificationValue.cmd == NAK || NotificationValue.cmd == TIMEOUT){
-				HAL_UART_Transmit(&huart2, "timeout\n", 8, 2000);
+				HAL_UART_Transmit(&huart2, "Connect timeout\n", 16, 2000);
 				int packet_index = bsp_lora_check_cmd_in_node_send_packets(&NODE_DEVICE[lr_nw_node_index], LORA_CMD_CONNECT);
 				if(packet_index != -1){
 					if(NODE_DEVICE[lr_nw_node_index].last_lora_send_packet[packet_index].ttl > 0){
@@ -370,11 +371,11 @@ void lora_network_connect_to_all_nodes_task(void *param){
 				taskEXIT_CRITICAL();
 
 			}
-			STM_LOG("node device: %d\n", lr_nw_node_index + 1, 14);
 
 			if(lr_nw_connect_mode == LORA_STATUS_IDLE){
 				lora_network_send_request_setup_scheduler();
 			}
+			/* exit safe mode */
 			bsp_lora_exit_safe_mode();
 			xSemaphoreGive(spi_mutex);
 		}
@@ -389,31 +390,37 @@ void lora_network_send_read_request_to_all_nodes_task(void *param){
 	vTimerSetTimerID(send_data_timer, (void *)SW_TIMER_SEND_REQUEST);
 	while(1){
 		if(xQueueReceive(send_request_queue, &NotificationValue, portMAX_DELAY)){
+			/* get spi key and enter to safe mode to avoid the situation when lora's data's conflicted */
 			xSemaphoreTake(spi_mutex, portMAX_DELAY);
 			bsp_lora_enter_safe_mode();
 
 			while(HAL_SPI_GetState(myLoRa.hSPIx) != HAL_SPI_STATE_READY);
 			while(bsp_lora_check_cad() == 1);
+			bsp_lora_set_receive_mode();
 
-			STM_LOG("send notice v: %2d\n", NotificationValue.cmd, 19);
+			STM_LOG("Send notice v: %2d\n", NotificationValue.cmd, 19);
 
+			/* start send request */
 			if(NotificationValue.cmd == START_SEND_REQUEST){
-				STM_LOG("send request n%2d\n", lr_nw_send_request_index, 17);
+				STM_LOG("Send request n%2d\n", lr_nw_send_request_index, 17);
 				bsp_lora_send_packet_to_node(&CONNECTED_NODE[lr_nw_send_request_index], LORA_CMD_READ_DATA, 0, NULL, 0, 3);
 				xTimerStart(send_data_timer, 0);
 			}
 
+			/* receive ack for the packet have sent */
 			else if(NotificationValue.cmd == ACK){
-				STM_LOG("ack send request n%2d\n", lr_nw_send_request_index, 22);
+				STM_LOG("Ack send request n%2d\n", lr_nw_send_request_index, 22);
 				int packet_index = bsp_lora_check_cmd_in_node_send_packets(&CONNECTED_NODE[lr_nw_send_request_index], LORA_CMD_READ_DATA);
 				if(packet_index != -1){
+					STM_LOG("Remove packet with pid: %3d\n", CONNECTED_NODE[lr_nw_send_request_index].last_lora_send_packet[packet_index].packet_id, 28);
 					bsp_lora_remove_packet_from_node_send_packets(&CONNECTED_NODE[lr_nw_send_request_index], packet_index);
 				}
 				lr_nw_send_request_index++;
 			}
 
+			/* timeout or receive nack for the packet have sent */
 			else if(NotificationValue.cmd == NAK || NotificationValue.cmd == TIMEOUT){
-				STM_LOG("timeout or nak n%2d\n", lr_nw_send_request_index, 19);
+				STM_LOG("Send request timeout or nak n%2d\n", lr_nw_send_request_index, 32);
 				int packet_index = bsp_lora_check_cmd_in_node_send_packets(&CONNECTED_NODE[lr_nw_send_request_index], LORA_CMD_READ_DATA);
 				if(packet_index != -1){
 					if(CONNECTED_NODE[lr_nw_send_request_index].last_lora_send_packet[packet_index].ttl > 0){
@@ -424,7 +431,7 @@ void lora_network_send_read_request_to_all_nodes_task(void *param){
 					else{
 						CONNECTED_NODE[lr_nw_send_request_index].error = 2;
 						bsp_lora_remove_packet_from_node_send_packets(&CONNECTED_NODE[lr_nw_send_request_index], packet_index);
-						STM_LOG("error n%2d\n", lr_nw_send_request_index, 10);
+						STM_LOG("Error n%2d\n", lr_nw_send_request_index, 10);
 						lr_nw_send_request_index++;
 					}
 				}
@@ -434,6 +441,7 @@ void lora_network_send_read_request_to_all_nodes_task(void *param){
 			if(lr_nw_send_request_index >= lr_nw_connected_node_quantity)
 				lr_nw_send_request_index = 0;
 
+			/* exit safe mode */
 			bsp_lora_exit_safe_mode();
 			xSemaphoreGive(spi_mutex);
 		}
@@ -466,8 +474,8 @@ void lora_network_send_request_reset_scheduler(){
 
 void lora_network_send_request_setup_scheduler(){
 	if(lr_nw_connected_node_quantity > 0){
-		HAL_UART_Transmit(&huart2, "setup\n", 6, 2000);
-		STM_LOG("nqtt: %2d\n", lr_nw_connected_node_quantity, 10);
+		HAL_UART_Transmit(&huart2, "Scheduler setup\n", 16, 2000);
+		STM_LOG("Nqtt: %2d\n", lr_nw_connected_node_quantity, 10);
 
 		lr_nw_last_connected_node_quantity = lr_nw_connected_node_quantity;
 		uint32_t time_interval = SEND_REQUEST_TIME_PERIOD / lr_nw_connected_node_quantity;
@@ -483,11 +491,23 @@ void lora_network_send_request_setup_scheduler(){
 	else{
 		lora_network_send_request_stop_scheduler();
 	}
+
+	uart_data_frame_t uart_data_buffer = {0};
+	uart_data_buffer.len = lr_nw_connected_node_quantity + 2;
+	uart_data_buffer.cmd = UART_CMD_INITIALISE_NODE_QUANTITY;
+	uart_data_buffer.node_id = lr_nw_connected_node_quantity;
+
+	for(uint8_t i = 0; i < lr_nw_connected_node_quantity; i++){
+		uart_data_buffer.raw_data[i] = CONNECTED_NODE[i].id;
+	}
+
+	uint8_t *packet_bufer = (uint8_t *)(&uart_data_buffer);
+	HAL_UART_Transmit(&huart1, packet_bufer, sizeof(uart_data_frame_t), 2000);
 }
 
 void lora_network_send_request_scheduler(){
 	if(semaphore_count == 0){
-		STM_LOG("lr_nw_scheduler\n", 0, 16);
+		STM_LOG("Scheduler call back\n", 0, 19);
 		BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
 		connection_task_notification_value_t NotificationValue;
 		NotificationValue.cmd = START_SEND_REQUEST;
@@ -498,6 +518,8 @@ void lora_network_send_request_scheduler(){
 
 }
 
+
+/* this function is used to send remain lora packets that haven't sent */
 void lora_network_handle_last_lora_send_packets_task(void *param){
 	connection_task_notification_value_t NotificationValue;
 	while(1){
@@ -505,26 +527,30 @@ void lora_network_handle_last_lora_send_packets_task(void *param){
 		xSemaphoreTake(spi_mutex, portMAX_DELAY);
 		bsp_lora_enter_safe_mode();
 
-		STM_LOG("handle last packet\n", 0, 19);
+		STM_LOG("Handle last packet\n", 0, 19);
 
 
 
-		STM_LOG("rp cmd2: %2d\n", last_lora_send_packet_buffer[0].cmd, 12);
+		STM_LOG("Last packet cmd: %2d\n", last_lora_send_packet_buffer[0].cmd, 20);
+
+		/* if last lora send packet is a packet contain CONNECT command */
 		if(last_lora_send_packet_buffer[0].cmd == LORA_CMD_CONNECT){
-			STM_LOG("last packet cn\n", 0, 15);
+			STM_LOG("Last packet is connect packet\n", 0, 29);
 			NotificationValue.cmd = NAK;
 			xQueueSend(all_connect_queue, &NotificationValue, portMAX_DELAY);
 		}
 
+		/* if last lora send packet is a packet contain DISCONNECT command */
 		else if(last_lora_send_packet_buffer[0].cmd == LORA_CMD_DISCONNECT){
-			STM_LOG("last packet dn\n", 0, 15);
+			STM_LOG("Last packet is disconnect packet\n", 0, 32);
 			NotificationValue.cmd = NAK;
 			xQueueSend(all_disconnect_queue, &NotificationValue, portMAX_DELAY);
 		}
 
+		/* if last lora send packet is a packet contain READ_DATA command */
 		else if(last_lora_send_packet_buffer[0].cmd == LORA_CMD_READ_DATA){
 			lora_network_send_request_reset_scheduler();
-			STM_LOG("last packet send\n", 0, 17);
+			STM_LOG("Last packet is send request packet\n", 0, 35);
 			NotificationValue.cmd = NAK;
 			NotificationValue.value = 0;
 			xQueueSend(send_request_queue, &NotificationValue, portMAX_DELAY);
@@ -542,6 +568,7 @@ void lora_network_handle_last_lora_send_packets_task(void *param){
 }
 
 
+/* this fuction is used to response the warning packets from the nodes */
 void lora_network_response_warning_nodes_task(void *param){
 	connection_task_notification_value_t NotificationValue;
 	while(1){
@@ -552,6 +579,7 @@ void lora_network_response_warning_nodes_task(void *param){
 
 		while(HAL_SPI_GetState(myLoRa.hSPIx) != HAL_SPI_STATE_READY);
 		while(bsp_lora_check_cad() == 1);
+		bsp_lora_set_receive_mode();
 
 		if(NotificationValue.cmd == START_RESPONSE_WARNING){
 			uint8_t lora_node_id = NotificationValue.value;
@@ -566,9 +594,23 @@ void lora_network_response_warning_nodes_task(void *param){
 			if(lora_node != NULL){
 				int packet_index = bsp_lora_check_cmd_in_node_receive_packets(lora_node, LORA_CMD_WARNING);
 				if(packet_index != -1){
-					uint8_t *packet_bufer = (uint8_t *)(&lora_node->last_lora_receive_packet[packet_index]);
-					HAL_UART_Transmit(&huart1, packet_bufer, sizeof(lora_packet_t), 2000);
+					uart_data_frame_t uart_data_buffer = {0};
+					uart_data_buffer.len = 42;
+					uart_data_buffer.cmd = UART_CMD_HANDLE_WARNING_NODE;
+					uart_data_buffer.node_id = lora_node->id;
+					uart_data_buffer.raw_data[0] = lora_node->connected;
+					uart_data_buffer.raw_data[1] = lora_node->error;
+					// the first item of the payload contain information about the machine and remaining elements contain information about different things such as relay or contactor...
+					// = 0: not working; = 1: working; = 2: error
+					uart_data_buffer.raw_data[2] = lora_node->last_lora_receive_packet[packet_index].payload[0];
+					uint8_t *packet_bufer = (uint8_t *)(&uart_data_buffer);
+					HAL_UART_Transmit(&huart1, packet_bufer, sizeof(uart_data_frame_t), 2000);
+
+					STM_LOG("First item of warning data: %2d\n", raw_data[2], 32);
+
+					uint8_t responsed_byte = lora_node->last_lora_receive_packet[packet_index].packet_id;
 					memset(&lora_node->last_lora_receive_packet[packet_index], 0, sizeof(lora_packet_t));
+					lora_send_packet_buffer.responsed = responsed_byte;
 					bsp_lora_send_packet_to_node(lora_node, LORA_CMD_ACK, 0, NULL, 0, 3);
 				}
 			}
@@ -578,6 +620,7 @@ void lora_network_response_warning_nodes_task(void *param){
 			uint8_t lora_node_id = NotificationValue.value;
 			lora_node_t *lora_node = NULL;
 
+			//HAL_UART_Transmit(&huart2, "ack packet debug 1\n", 19, 2000);
 			for(uint8_t node_index = 0; node_index < lr_nw_connected_node_quantity; node_index++){
 				if(CONNECTED_NODE[node_index].id == lora_node_id){
 					lora_node = &CONNECTED_NODE[node_index];
@@ -586,10 +629,30 @@ void lora_network_response_warning_nodes_task(void *param){
 			}
 
 			if(lora_node != NULL){
+				//HAL_UART_Transmit(&huart2, "ack packet debug 2\n", 19, 2000);
+
 				int packet_index = bsp_lora_check_cmd_in_node_receive_packets(lora_node, LORA_CMD_ACK);
 				if(packet_index != -1){
-					uint8_t *packet_bufer = (uint8_t *)(&lora_node->last_lora_receive_packet[packet_index]);
-					HAL_UART_Transmit(&huart1, packet_bufer, sizeof(lora_packet_t), 2000);
+
+					//HAL_UART_Transmit(&huart2, "ack packet debug 3\n", 19, 2000);
+
+					uart_data_frame_t uart_data_buffer = {0};
+					uart_data_buffer.len = 42;
+					uart_data_buffer.cmd = UART_CMD_HANDLE_DATA_READ_FROM_NODE;
+					uart_data_buffer.node_id = lora_node->id;
+					uart_data_buffer.raw_data[0] = lora_node->connected;
+					uart_data_buffer.raw_data[1] = lora_node->error;
+					// the first item of the payload contain information about the machine and remaining elements contain information about different things such as relay or contactor...
+					// = 0: not working; = 1: working; = 2: error
+					uart_data_buffer.raw_data[2] = lora_node->last_lora_receive_packet[packet_index].payload[0];
+					memcpy(&uart_data_buffer.raw_data[2], lora_node->last_lora_receive_packet[packet_index].payload, MAX_PAYLOAD_LENGTH);
+					uint8_t *packet_bufer = (uint8_t *)(&uart_data_buffer);
+
+					uint8_t debug_buffer[20];
+					sprintf(debug_buffer, "ack buffer:%2d,%2d\n", lora_node->last_lora_receive_packet[packet_index].payload[0], lora_node->last_lora_receive_packet[packet_index].payload[1]);
+					HAL_UART_Transmit(&huart2, debug_buffer, sizeof(debug_buffer), 2000);
+
+					HAL_UART_Transmit(&huart1, packet_bufer, sizeof(uart_data_frame_t), 2000);
 					memset(&lora_node->last_lora_receive_packet[packet_index], 0, sizeof(lora_packet_t));
 				}
 			}
@@ -608,7 +671,7 @@ void lora_network_timer_task(TimerHandle_t xTimer){
 		connection_task_notification_value_t NotificationValue;
 		NotificationValue.cmd = TIMEOUT;
 		NotificationValue.value = 0;
-		HAL_UART_Transmit(&huart2, "swtimer\n", 8, 2000);
+		HAL_UART_Transmit(&huart2, "Connect timeout\n", 15, 2000);
 		xTimerStop(xTimer, 0);
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		xQueueSendFromISR(all_connect_queue, &NotificationValue, &xHigherPriorityTaskWoken);
@@ -618,7 +681,7 @@ void lora_network_timer_task(TimerHandle_t xTimer){
 		connection_task_notification_value_t NotificationValue;
 		NotificationValue.cmd = TIMEOUT;
 		NotificationValue.value = 0;
-		HAL_UART_Transmit(&huart2, "swtimer\n", 8, 2000);
+		HAL_UART_Transmit(&huart2, "Disconnect timeout\n", 18, 2000);
 		xTimerStop(xTimer, 0);
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		xQueueSendFromISR(all_disconnect_queue, &NotificationValue, &xHigherPriorityTaskWoken);
@@ -628,7 +691,7 @@ void lora_network_timer_task(TimerHandle_t xTimer){
 		connection_task_notification_value_t NotificationValue;
 		NotificationValue.cmd = TIMEOUT;
 		NotificationValue.value = 0;
-		HAL_UART_Transmit(&huart2, "swtimer\n", 8, 2000);
+		HAL_UART_Transmit(&huart2, "Send request timeout\n", 21, 2000);
 		xTimerStop(xTimer, 0);
 		BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 		xQueueSendFromISR(send_request_queue, &NotificationValue, &xHigherPriorityTaskWoken);
@@ -636,12 +699,16 @@ void lora_network_timer_task(TimerHandle_t xTimer){
 	}
 }
 
+
+/* if the gw is sending a packet through lora but not received ack packet yet, and at the same time it receive cmd from
+ * user or receive warning or ack packet from other nodes, it will save this current packet and process incoming packet */
 void lora_network_save_current_work(){
 	if(lora_send_packet_buffer.destination_id != 0){
 		if(lora_send_packet_buffer.responsed == 0){
 
 			STM_LOG("save curent task\n", 0, 17);
 
+			/* if time to live byte of packet is still > 0 */
 			if(lora_send_packet_buffer.ttl > 0){
 				STM_LOG("save curent task1\n", 0, 18);
 				xSemaphoreGiveFromISR(last_lora_send_packet_counting_semaphore, NULL);
@@ -665,6 +732,8 @@ void lora_network_save_current_work(){
 				}
 			}
 
+			/* if time to live of packet equal to 0 but this packet haven't exceeded the timeout that mean the timer is
+			 * still counting */
 			else{
 				if(lora_send_packet_buffer.cmd == LORA_CMD_CONNECT){
 					if(NODE_DEVICE[lr_nw_node_index].error <= 1){
@@ -713,7 +782,6 @@ void lora_network_save_current_work(){
 					}
 				}
 			}
-			STM_LOG("rp cmd: %2d\n", last_lora_send_packet_buffer[0].cmd, 11);
 		}
 	}
 }
@@ -784,6 +852,9 @@ void lora_network_cmd_ack_handle(){
 
 	// check if this is ack for lora_send_buffer or last_lora_send_buffers
 	// if this ack is for lora_send_buffer
+	HAL_UART_Transmit(&huart2, "Ack handle\n", 11, 2000);
+	STM_LOG("Responsed value: %3d\n", responsed, 22);
+
 	if(responsed == lora_send_packet_buffer.packet_id){
 		// get node object which the gateway received from
 		lora_buffer = &lora_send_packet_buffer;
@@ -798,8 +869,6 @@ void lora_network_cmd_ack_handle(){
 			}
 		}
 	}
-
-	STM_LOG("rp: %3d\n", responsed, 9);
 
 	if(lora_buffer != NULL){
 		lora_buffer->responsed = responsed;
@@ -833,7 +902,7 @@ void lora_network_cmd_ack_handle(){
 				// notify to connection task with notification value = ACK
 				NotificationValue.cmd = ACK;
 				NotificationValue.value = 0;
-				HAL_UART_Transmit(&huart2, "notify\n", 7, 2000);
+				HAL_UART_Transmit(&huart2, "Notify\n", 7, 2000);
 				xQueueSendFromISR(all_connect_queue, &NotificationValue, &pxHigherPriorityTaskWoken);
 				portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 			}
@@ -860,10 +929,7 @@ void lora_network_cmd_ack_handle(){
 				NotificationValue.cmd = ACK;
 				NotificationValue.value = 0;
 
-				STM_LOG("node qtt: %3d\n", lr_nw_connected_node_quantity, 14);
-				for(int i = 0; i < lr_nw_connected_node_quantity; i++){
-					STM_LOG("dcn node id: %2d\n", CONNECTED_NODE[i].id, 16);
-				}
+				STM_LOG("Node quantity: %3d\n", lr_nw_connected_node_quantity, 19);
 
 				xQueueSendFromISR(all_disconnect_queue, &NotificationValue, &pxHigherPriorityTaskWoken);
 				portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
@@ -879,28 +945,28 @@ void lora_network_cmd_ack_handle(){
 					}
 
 					CONNECTED_NODE[i].error = 0;
+
 					if(lora_receive_packet_buffer.payload_length > 0){
 						// receive responsed packet from the node here
-						packet_index = bsp_lora_check_cmd_in_node_receive_packets(&CONNECTED_NODE[i], LORA_CMD_ACK);
-						packet_index1 = bsp_lora_get_id_in_node_receive_packets(&CONNECTED_NODE[i], lora_receive_packet_buffer.packet_id);
-						packet_index3 = bsp_lora_get_node_receive_packet_index(&CONNECTED_NODE[i]);
+						int packet_index = bsp_lora_check_cmd_in_node_receive_packets(&CONNECTED_NODE[i], LORA_CMD_ACK);
+						int packet_index1 = bsp_lora_get_id_in_node_receive_packets(&CONNECTED_NODE[i], lora_receive_packet_buffer.packet_id);
+						int packet_index3 = bsp_lora_get_node_receive_packet_index(&CONNECTED_NODE[i]);
+
 						if((packet_index == -1 || packet_index1 == -1) && (packet_index3 != -1)){
-							memcpy(&CONNECTED_NODE[i].last_lora_receive_packet[packet_index3], lora_receive_packet_buffer, sizeof(lora_packet_t));
+							HAL_UART_Transmit(&huart2, "Ack packet has payload length > 0\n", 34, 2000);
+
+							memcpy(&CONNECTED_NODE[i].last_lora_receive_packet[packet_index3], &lora_receive_packet_buffer, sizeof(lora_packet_t));
 
 							NotificationValue.cmd = START_HANDLE_ACK_PACKET;
 							NotificationValue.value = CONNECTED_NODE[i].id;
 							xQueueSendFromISR(warning_queue, &NotificationValue, &pxHigherPriorityTaskWoken);
 						}
-
-						// send packet to ESP32 if it contains data sent by CONNECTED_NODE[i]
-						/*uint8_t *buffer = (uint8_t *)(&lora_receive_packet_buffer);
-						HAL_UART_Transmit(&huart1, buffer, sizeof(lora_packet_t), 2000);*/
 					}
 
 					NotificationValue.cmd = ACK;
 					NotificationValue.value = 0;
 
-					HAL_UART_Transmit(&huart2, "notify\n", 7, 2000);
+					HAL_UART_Transmit(&huart2, "Notify\n", 7, 2000);
 					xQueueSendFromISR(send_request_queue, &NotificationValue, &pxHigherPriorityTaskWoken);
 					portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 					break;
@@ -908,6 +974,7 @@ void lora_network_cmd_ack_handle(){
 			}
 		}
 
+		/* receive packet from last lora send packet if the ack is for it */
 		if(handling_last_buffer == 1){
 			for(int i = k; i < semaphore_count - 1; i++){
 				memcpy(&last_lora_send_packet_buffer[i], &last_lora_send_packet_buffer[i + 1], sizeof(lora_packet_t));
@@ -927,6 +994,9 @@ void lora_network_cmd_nack_handle(){
 	connection_task_notification_value_t NotificationValue;
 	lora_packet_t * lora_buffer;
 
+	HAL_UART_Transmit(&huart2, "Nack handle\n", 12, 2000);
+	STM_LOG("Responsed value: %3d\n", responsed, 22);
+
 	// check if this is ack for lora_send_buffer or last_lora_send_buffers
 	// if this ack is for lora_send_buffer
 	if(responsed == lora_send_packet_buffer.packet_id){
@@ -943,8 +1013,6 @@ void lora_network_cmd_nack_handle(){
 			}
 		}
 	}
-
-	STM_LOG("rp: %3d\n", responsed, 9);
 
 	if(lora_buffer != NULL){
 		lora_buffer->responsed = responsed;
@@ -971,7 +1039,7 @@ void lora_network_cmd_nack_handle(){
 				// notify to connection task with notification value = NAK
 				NotificationValue.cmd = NAK;
 				NotificationValue.value = 0;
-				HAL_UART_Transmit(&huart2, "nak connect\n", 12, 2000);
+				HAL_UART_Transmit(&huart2, "Nak connect\n", 12, 2000);
 				xQueueSendFromISR(all_connect_queue, &NotificationValue, &pxHigherPriorityTaskWoken);
 				portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 			}
@@ -986,7 +1054,7 @@ void lora_network_cmd_nack_handle(){
 				lora_node->error = 1;
 				NotificationValue.cmd = NAK;
 				NotificationValue.value = 0;
-				HAL_UART_Transmit(&huart2, "nak disconnect\n", 15, 2000);
+				HAL_UART_Transmit(&huart2, "Nak disconnect\n", 15, 2000);
 
 
 				xQueueSendFromISR(all_disconnect_queue, &NotificationValue, &pxHigherPriorityTaskWoken);
@@ -1007,7 +1075,7 @@ void lora_network_cmd_nack_handle(){
 					NotificationValue.cmd = NAK;
 					NotificationValue.value = 0;
 
-					HAL_UART_Transmit(&huart2, "nak send\n", 9, 2000);
+					HAL_UART_Transmit(&huart2, "Nak send\n", 9, 2000);
 					xQueueSendFromISR(send_request_queue, &NotificationValue, &pxHigherPriorityTaskWoken);
 					portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 					break;
@@ -1034,11 +1102,9 @@ void lora_network_cmd_warning_handle(){
 		}
 	}
 	if(lora_node != NULL){
-
-
 		int packet_index = bsp_lora_get_node_receive_packet_index(lora_node);
 		if(packet_index != -1){
-			STM_LOG("warning from node %2d\n", lora_node->id, 21);
+			STM_LOG("Warning from node %2d\n", lora_node->id, 21);
 			memcpy(&lora_node->last_lora_receive_packet[packet_index], &lora_receive_packet_buffer, sizeof(lora_packet_t));
 
 			connection_task_notification_value_t NotificationValue;
@@ -1072,12 +1138,11 @@ void lora_network_receive_packet_handle(){
  * lora irq handle function is used to receive packet through interrupt of DIO0 pin
  * **/
 void lora_network_irq_handle(){
-	if(bsp_lora_spi_is_free()){
-		uint8_t irqFlags = LoRa_read(&myLoRa, RegIrqFlags);
-		if(irqFlags & 0x40) {
-			bsp_lora_receive_packet();
-			// All data have received and saved to lora_receive_packet_buffer
-			lora_network_receive_packet_handle();
-		}
+	while (HAL_SPI_GetState(myLoRa->hSPIx) != HAL_SPI_STATE_READY);
+	uint8_t irqFlags = LoRa_read(&myLoRa, RegIrqFlags);
+	if(irqFlags & 0x40) {
+		bsp_lora_receive_packet();
+		// All data have received and saved to lora_receive_packet_buffer
+		lora_network_receive_packet_handle();
 	}
 }

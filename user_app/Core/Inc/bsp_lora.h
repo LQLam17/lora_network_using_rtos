@@ -72,17 +72,22 @@ void bsp_lora_remove_packet_from_node_send_packets(lora_node_t *lora_node, uint8
 
 int bsp_lora_get_node_receive_packet_index(lora_node_t *lora_node);
 int bsp_lora_check_cmd_in_node_receive_packets(lora_node_t *lora_node, uint8_t lora_cmd);
+int bsp_lora_get_id_in_node_receive_packets(lora_node_t *lora_node, uint8_t packet_id);
 void bsp_lora_remove_packet_from_node_receive_packets(lora_node_t *lora_node, uint8_t index);
 
-
+void STM_LOG(char *str, int c, uint8_t size);
 
 void bsp_lora_init();
+
+void bsp_lora_enter_safe_mode();
+
+void bsp_lora_exit_safe_mode();
 
 void bsp_lora_set_receive_mode();
 
 void bsp_lora_set_cad_mode();
 
-void LoRa_CAD_Detect();
+uint8_t bsp_lora_check_cad();
 
 void bsp_lora_send_packet_to_node(lora_node_t *des_node, uint8_t cmd, uint32_t mem_addr, uint8_t *data, uint8_t len, uint8_t ttl);
 
