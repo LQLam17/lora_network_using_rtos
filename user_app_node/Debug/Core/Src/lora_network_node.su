@@ -1,0 +1,5 @@
+../Core/Src/lora_network_node.c:33:6:lora_network_send_warning	48	static
+../Core/Src/lora_network_node.c:85:6:lora_network_send_response	64	static
+../Core/Src/lora_network_node.c:126:6:lora_network_ack_cmd_handle	24	static
+../Core/Src/lora_network_node.c:140:6:lora_network_irq_handle	32	static
+../Core/Src/lora_network_node.c:180:6:lora_network_process	8	static
