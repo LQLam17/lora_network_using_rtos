@@ -18,6 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "bsp_sim.h"
+#include "lora_network_node.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -46,24 +48,116 @@ I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim3;
+
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
+const char apn[]  = "m3-world"; // Change this to your Provider details
+const char host[] = "tcp://mqtt.eclipseprojects.io"; // Change this to your host
+const int  port = 1883;
+const char username[] = "";
+const char password[] = "";
+const char topic[] = "lequanglam18112003@gmail.com/pub_topic";
+const uint32_t timeOut =10000;
+char ATcommand[80];
+uint8_t buffer[160] = {0};
+uint8_t ATisOK = 0;
+uint8_t CGREGisOK = 0;
+uint32_t previousTick;
+uint16_t readValue;
+char charData[15] = "hello\r\n";
+
+void SIMTransmit(char *cmd)
+{
+  memset(buffer,0,sizeof(buffer));
+  HAL_UART_Transmit(&huart1,(uint8_t *)cmd,strlen(cmd),1000);
+  HAL_UART_Receive (&huart1, buffer, 100, 1000);
+}
+
+void mqttPublish(void)
+{
+  ATisOK = 0;
+  CGREGisOK = 0;
+
+  // Check for OK response for AT
+  previousTick =  HAL_GetTick();
+  while(!ATisOK && previousTick  + timeOut >  HAL_GetTick())
+  {
+    SIMTransmit("AT\r\n");
+    HAL_Delay(1000);
+    if(strstr((char *)buffer,"OK"))
+    {
+      ATisOK = 1;
+      SIMTransmit("ATE0\r\n");
+      //HAL_Delay(1000);
+    }
+  }
+
+  // Check for network registration.
+  if(ATisOK)
+  {
+    previousTick =  HAL_GetTick();
+    while(!CGREGisOK  && previousTick  + timeOut >  HAL_GetTick())
+    {
+      SIMTransmit("AT+CGREG?\r\n");
+      if(strstr((char *)buffer,"+CGREG: 0,1")) // Use 0,5 For Roaming
+      {
+        CGREGisOK = 1;
+      }
+    }
+  }
+
+  // If registered
+  if(CGREGisOK)
+  {
+	sprintf(ATcommand,"AT+CGDCONT=1,\"IP\",\"%s\"\r\n",apn); // Specify the value of  PDP context
+	SIMTransmit(ATcommand);
+	HAL_Delay(2000);
+	SIMTransmit("AT+CMQTTSTART\r\n"); // Start MQTT Service
+	SIMTransmit("AT+CMQTTACCQ=0,\"client01\"\r\n"); // Acquire a Client
+	sprintf(ATcommand,"AT+CMQTTCONNECT=0,\"%s:%d\",60,1\r\n",host,port); // Connect to a MQTT Server
+	// sprintf(ATcommand,"AT+CMQTTCONNECT=0,\"%s:%d\",60,1,%s,%s\r\n",host,port,username,password);
+	SIMTransmit(ATcommand);
+	sprintf(ATcommand,"AT+CMQTTTOPIC=0,%d\r\n",strlen(topic)); // Set the topic for publish message
+	SIMTransmit(ATcommand);
+	sprintf(ATcommand,"%s\r\n",topic);
+	SIMTransmit(ATcommand);
+	sprintf(ATcommand,"AT+CMQTTPAYLOAD=0,%d\r\n",strlen(charData)-2); // Set the payload
+	SIMTransmit(ATcommand);
+	SIMTransmit(charData);
+	SIMTransmit("AT+CMQTTPUB=0,1,60\r\n"); // Publish
+	HAL_Delay(500);
+	SIMTransmit("AT+CMQTTDISC=0,120\r\n"); // Disconnect from Server
+	SIMTransmit("AT+CMQTTREL=0\r\n"); // Release the Client
+	SIMTransmit("AT+CMQTTSTOP\r\n"); // Stop MQTT Service
+  }
+}
+
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 	if(GPIO_Pin == Button1_Pin){
 		test_warning_flag = 1;
 	}
+
+	else if(GPIO_Pin == LORA_DIO0_Pin){
+		lora_network_irq_handle();
+	}
+
 }
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -102,19 +196,25 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
-
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
+  //bsp_sim_init_mqtt();
+
+  //HAL_Delay(60000);
+  lora_network_init();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  lora_network_process();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -236,6 +336,51 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 16000-1;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 30-1;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -302,6 +447,22 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA2_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA2_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream2_IRQn, 4, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream2_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -330,15 +491,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LORA_DIO0_Pin */
-  GPIO_InitStruct.Pin = LORA_DIO0_Pin;
+  /*Configure GPIO pins : LORA_DIO0_Pin Button1_Pin Button2_Pin Button3_Pin */
+  GPIO_InitStruct.Pin = LORA_DIO0_Pin|Button1_Pin|Button2_Pin|Button3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(LORA_DIO0_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : Button1_Pin Button2_Pin Button3_Pin */
-  GPIO_InitStruct.Pin = Button1_Pin|Button2_Pin|Button3_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -352,6 +507,15 @@ static void MX_GPIO_Init(void)
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI0_IRQn, 3, 0);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI2_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

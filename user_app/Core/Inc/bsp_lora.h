@@ -68,6 +68,7 @@ extern lora_packet_t lora_receive_packet_buffer;
 int bsp_lora_spi_is_free();
 
 int bsp_lora_check_cmd_in_node_send_packets(lora_node_t *lora_node, uint8_t lora_cmd);
+int bsp_lora_check_cmd_and_id_in_node_send_packets(lora_node_t *lora_node, uint8_t lora_cmd, uint8_t packet_id);
 void bsp_lora_remove_packet_from_node_send_packets(lora_node_t *lora_node, uint8_t index);
 
 int bsp_lora_get_node_receive_packet_index(lora_node_t *lora_node);
@@ -82,6 +83,10 @@ void bsp_lora_init();
 void bsp_lora_enter_safe_mode();
 
 void bsp_lora_exit_safe_mode();
+
+void bsp_pc_user_enter_safe_mode();
+
+void bsp_pc_user_exit_safe_mode();
 
 void bsp_lora_set_receive_mode();
 

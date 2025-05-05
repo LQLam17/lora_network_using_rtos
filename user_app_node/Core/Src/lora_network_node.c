@@ -6,6 +6,7 @@
  */
 
 #include "lora_network_node.h"
+#include "bsp_sim.h"
 
 extern lora_packet_t lora_receive_packet[NUMBER_OF_LORA_PACKET_BUFFER];
 extern lora_packet_t lora_send_packet[NUMBER_OF_LORA_PACKET_BUFFER];
@@ -29,6 +30,13 @@ uint8_t lr_nw_packet_id = 1;
 extern UART_HandleTypeDef huart2;
 extern lora_packet_t lora_receive_packet_buffer;
 extern LoRa myLoRa;
+
+void lora_network_init(){
+	bsp_lora_init();
+	/*if(bsp_sim_init_mqtt()){
+		STM_LOG("Sim mqtt init success\n", 0, 22);
+	}*/
+}
 
 void lora_network_send_warning(){
 	uint32_t last_tick = 0;
@@ -84,7 +92,7 @@ void lora_network_send_warning(){
 
 void lora_network_send_response(uint8_t cmd){
 	while(HAL_SPI_GetState(myLoRa.hSPIx) != HAL_SPI_STATE_READY);
-	while(bsp_lora_check_cad() == 1);
+	//while(bsp_lora_check_cad() == 1);
 	bsp_lora_set_receive_mode();
 	lr_nw_packet_id = (lr_nw_packet_id % (MAX_PACKET_ID)) + 1;
 	int packet_index = -1;
@@ -138,13 +146,16 @@ void lora_network_ack_cmd_handle(){
 }
 
 void lora_network_irq_handle(){
+	STM_LOG("DIO0\n", 0, 5);
 	while (HAL_SPI_GetState(myLoRa.hSPIx) != HAL_SPI_STATE_READY);
 	uint8_t irqFlags = LoRa_read(&myLoRa, RegIrqFlags);
 	if(irqFlags & 0x40) {
+		STM_LOG("irq\n", 0, 4);
 		bsp_lora_receive_packet();
 		uint8_t packet_id = lora_receive_packet_buffer.packet_id;
 		uint8_t cmd = lora_receive_packet_buffer.cmd;
 		uint8_t device_id = lora_receive_packet_buffer.destination_id;
+		STM_LOG("pid:%3d\n", packet_id, 8);
 		// if there is no packet has the same pid or cmd field with recent received packet
 		if((device_id == DEVICE_ID) &&
 		(lora_network_check_id_in_receive_packet(packet_id) == -1 || lora_network_check_cmd_in_receive_packet(cmd) == -1)){
@@ -154,17 +165,29 @@ void lora_network_irq_handle(){
 
 				switch(cmd){
 				case LORA_CMD_CONNECT:
-					connect_request_receive_flag = 1;
-					connect_packet_index = packet_index;
+					if(connect_request_receive_flag == 0){
+						STM_LOG("Set connect request flag\n", 0, 25);
+						connect_request_receive_flag = 1;
+						connect_packet_index = packet_index;
+					}
 					break;
+
 				case LORA_CMD_DISCONNECT:
-					disconnect_request_receive_flag = 1;
-					disconnect_packet_index = packet_index;
+					if(disconnect_request_receive_flag == 0){
+						STM_LOG("Set disconnect request flag\n", 0, 28);
+						disconnect_request_receive_flag = 1;
+						disconnect_packet_index = packet_index;
+					}
 					break;
+
 				case LORA_CMD_READ_DATA:
-					read_request_receive_flag = 1;
-					read_packet_index = packet_index;
+					if(read_request_receive_flag == 0){
+						STM_LOG("Set read request flag\n", 0, 22);
+						read_request_receive_flag = 1;
+						read_packet_index = packet_index;
+					}
 					break;
+
 				case LORA_CMD_ACK:
 					lora_network_ack_cmd_handle();
 				}

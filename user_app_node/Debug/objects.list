@@ -1,5 +1,6 @@
 "./Core/Src/LoRa.o"
 "./Core/Src/bsp_lora.o"
+"./Core/Src/bsp_sim.o"
 "./Core/Src/lora_network_node.o"
 "./Core/Src/main.o"
 "./Core/Src/stm32f4xx_hal_msp.o"

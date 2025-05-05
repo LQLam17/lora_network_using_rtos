@@ -81,6 +81,8 @@ void bsp_lora_set_cad_mode();
 
 uint8_t bsp_lora_check_cad();
 
+void bsp_lora_send_packet(uint8_t source_id, uint8_t des_id, uint8_t packet_id, uint8_t cmd, uint32_t mem_addr, uint8_t *data, uint8_t len, uint8_t ttl, uint8_t responsed);
+
 int bsp_lora_send_packet_to_device(uint8_t des_id, uint8_t cmd, uint32_t mem_addr, uint8_t *data, uint8_t len, uint8_t ttl, uint8_t responsed);
 
 void bsp_lora_resend_packet(lora_packet_t *lora_packet);
@@ -90,6 +92,14 @@ void lora_network_remove_packet_in_send_packet(uint8_t packet_index);
 void bsp_lora_receive_packet();
 
 void bsp_lora_irq_handle();
+
+int lora_network_get_index_of_receive_packet();
+
+int lora_network_check_id_in_receive_packet(uint8_t id);
+
+int lora_network_check_id_in_receive_packet(uint8_t id);
+
+int lora_network_check_cmd_in_receive_packet(uint8_t cmd);
 
 
 

@@ -18,7 +18,7 @@ lora_packet_t lora_receive_packet_buffer = {0};
 
 
 void bsp_lora_enter_safe_mode(){
-	NVIC_DisableIRQ(OTG_FS_IRQn);
+	//NVIC_DisableIRQ(OTG_FS_IRQn);
 	NVIC_DisableIRQ(EXTI0_IRQn);
 	NVIC_DisableIRQ(EXTI1_IRQn);
 	NVIC_DisableIRQ(EXTI2_IRQn);
@@ -26,11 +26,19 @@ void bsp_lora_enter_safe_mode(){
 }
 
 void bsp_lora_exit_safe_mode(){
-	NVIC_EnableIRQ(OTG_FS_IRQn);
+	//NVIC_EnableIRQ(OTG_FS_IRQn);
 	NVIC_EnableIRQ(EXTI0_IRQn);
 	NVIC_EnableIRQ(EXTI1_IRQn);
 	NVIC_EnableIRQ(EXTI2_IRQn);
 	NVIC_EnableIRQ(EXTI3_IRQn);
+}
+
+void bsp_pc_user_enter_safe_mode(){
+	//NVIC_DisableIRQ(OTG_FS_IRQn);
+}
+
+void bsp_pc_user_exit_safe_mode(){
+	//NVIC_EnableIRQ(OTG_FS_IRQn);
 }
 
 
@@ -49,9 +57,7 @@ int bsp_lora_spi_is_free(){
 
 
 void bsp_lora_set_receive_mode(){
-	bsp_lora_enter_safe_mode();
 	LoRa_startReceiving(&myLoRa);
-	bsp_lora_exit_safe_mode();
 }
 
 void bsp_lora_set_cad_mode(){
@@ -175,6 +181,16 @@ int bsp_lora_check_cmd_in_node_send_packets(lora_node_t *lora_node, uint8_t lora
 		if(lora_node->last_lora_send_packet[i].packet_id != 0 && lora_node->last_lora_send_packet[i].cmd == lora_cmd)
 			return i;
 	}
+	STM_LOG("Send buffer not contain cmd %2d", lora_node->id, 30);
+	STM_LOG(" cmd: %2d\n", lora_cmd,9);
+	return -1;
+}
+
+int bsp_lora_check_cmd_and_id_in_node_send_packets(lora_node_t *lora_node, uint8_t lora_cmd, uint8_t packet_id){
+	for(uint8_t i = 0; i < MAX_NODE_PACKET_ITEMS; i++){
+		if(lora_node->last_lora_send_packet[i].packet_id == packet_id && lora_node->last_lora_send_packet[i].cmd == lora_cmd)
+			return i;
+	}
 	return -1;
 }
 
@@ -210,52 +226,64 @@ int bsp_lora_check_cmd_in_node_receive_packets(lora_node_t *lora_node, uint8_t l
 }
 
 void bsp_lora_remove_packet_from_node_receive_packets(lora_node_t *lora_node, uint8_t index){
+	STM_LOG("Remove receive buffer[%d]\n", index, 25);
 	for(uint8_t i = index; i < MAX_NODE_PACKET_ITEMS - 1; i++){
 		memcpy(&lora_node->last_lora_receive_packet[i], &lora_node->last_lora_receive_packet[i + 1], sizeof(lora_packet_t));
 	}
 	memset(&lora_node->last_lora_receive_packet[MAX_NODE_PACKET_ITEMS - 1], 0, sizeof(lora_packet_t));
+
+	uint8_t buffer_qtt = 0;
+	for(uint8_t i = 0; i < MAX_NODE_PACKET_ITEMS; i++){
+		if(lora_node->last_lora_receive_packet[i].packet_id != 0){
+			buffer_qtt++;
+		}
+		else{
+			break;
+		}
+	}
+	STM_LOG("Receive buffer qtt: %d\n", buffer_qtt, 23);
 }
 
 /**
  * Send packet to a specific node
  * **/
 void bsp_lora_send_packet_to_node(lora_node_t *des_node, uint8_t cmd, uint32_t mem_addr, uint8_t *data, uint8_t len, uint8_t ttl){
-	if(bsp_lora_check_cmd_in_node_send_packets(des_node, cmd) == -1){
-		if(cmd == LORA_CMD_CONNECT){
-			if(des_node->connected == 0){
-				HAL_UART_Transmit(&huart2, (uint8_t *)"connecting\n", 12, 2000);
-				bsp_lora_send_packet(GATEWAY_ID, des_node->id, ((lora_send_packet_buffer.packet_id + 1) % (MAX_PACKET_ID + 1)) + 1
-								, LORA_CMD_CONNECT, 0, NULL, 0, 3);
-				HAL_UART_Transmit(&huart2, (uint8_t *)"sendcn\n", 7, 2000);
-			}
-			else{
-				HAL_UART_Transmit(&huart2, (uint8_t *)"Node is connected\n", 19, 2000);
-			}
+	if(cmd == LORA_CMD_CONNECT){
+		if(des_node->connected == 0){
+			HAL_UART_Transmit(&huart2, (uint8_t *)"connecting\n", 12, 2000);
+			bsp_lora_send_packet(GATEWAY_ID, des_node->id, (lora_send_packet_buffer.packet_id % MAX_PACKET_ID) + 1
+							, LORA_CMD_CONNECT, 0, NULL, 0, 3);
+			HAL_UART_Transmit(&huart2, (uint8_t *)"sendcn\n", 7, 2000);
 		}
-
-		else if(cmd == LORA_CMD_DISCONNECT){
-			if(des_node->connected == 1){
-				bsp_lora_send_packet(GATEWAY_ID, des_node->id, ((lora_send_packet_buffer.packet_id + 1) % (MAX_PACKET_ID + 1)) + 1
-											, LORA_CMD_DISCONNECT, 0, NULL, 0, 3);
-			}
-			else{
-				HAL_UART_Transmit(&huart2, "Node is disconnected\n", 21, 2000);
-			}
-		}
-
 		else{
-			HAL_UART_Transmit(&huart2, (uint8_t *)"read request\n", 13, 2000);
-			bsp_lora_send_packet(GATEWAY_ID, des_node->id, ((lora_send_packet_buffer.packet_id + 1) % (MAX_PACKET_ID + 1)) + 1,
-					cmd, mem_addr, data, len, ttl);
-		}
-
-		if(bsp_lora_get_node_send_packet_index(des_node) != -1){
-			uint8_t i = bsp_lora_get_node_send_packet_index(des_node);
-			memcpy(&des_node->last_lora_send_packet[i], &lora_send_packet_buffer, sizeof(lora_packet_t));
-			des_node->last_lora_send_packet[i].ttl--;
+			HAL_UART_Transmit(&huart2, (uint8_t *)"Node is connected\n", 19, 2000);
 		}
 	}
 
+	else if(cmd == LORA_CMD_DISCONNECT){
+		if(des_node->connected == 1){
+			bsp_lora_send_packet(GATEWAY_ID, des_node->id, ((lora_send_packet_buffer.packet_id + 1) % (MAX_PACKET_ID + 1)) + 1
+										, LORA_CMD_DISCONNECT, 0, NULL, 0, 3);
+		}
+		else{
+			HAL_UART_Transmit(&huart2, (uint8_t *)"Node is disconnected\n", 21, 2000);
+		}
+	}
+
+	else{
+		HAL_UART_Transmit(&huart2, (uint8_t *)"read request\n", 13, 2000);
+		bsp_lora_send_packet(GATEWAY_ID, des_node->id, ((lora_send_packet_buffer.packet_id + 1) % (MAX_PACKET_ID + 1)) + 1,
+				cmd, mem_addr, data, len, ttl);
+	}
+
+	if(bsp_lora_get_node_send_packet_index(des_node) != -1){
+		uint8_t i = bsp_lora_get_node_send_packet_index(des_node);
+		memcpy(&des_node->last_lora_send_packet[i], &lora_send_packet_buffer, sizeof(lora_packet_t));
+		des_node->last_lora_send_packet[i].ttl--;
+	}
+	else{
+		STM_LOG("Send buffer of node %2d is full\n", des_node->id, 31);
+	}
 }
 
 /**
@@ -303,9 +331,6 @@ void bsp_lora_send_request_disconnect(lora_node_t *des_node){
 /**
  * A function used to handle payload received from other devices
  */
-__weak void bsp_lora_handle_payload(uint8_t *data){
-
-}
 
 
 /**

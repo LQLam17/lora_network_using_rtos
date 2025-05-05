@@ -159,7 +159,7 @@ void bsp_lora_send_packet(uint8_t source_id, uint8_t des_id, uint8_t packet_id, 
 
 int lora_network_get_index_of_receive_packet(){
 	for(uint8_t i = 0; i < NUMBER_OF_LORA_PACKET_BUFFER; i++){
-		if(lora_receive_packet[i].packet_id != 0)
+		if(lora_receive_packet[i].packet_id == 0)
 			return i;
 	}
 	return -1;

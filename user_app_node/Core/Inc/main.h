@@ -64,8 +64,10 @@ void Error_Handler(void);
 #define LORA_DIO0_EXTI_IRQn EXTI0_IRQn
 #define Button1_Pin GPIO_PIN_1
 #define Button1_GPIO_Port GPIOB
+#define Button1_EXTI_IRQn EXTI1_IRQn
 #define Button2_Pin GPIO_PIN_2
 #define Button2_GPIO_Port GPIOB
+#define Button2_EXTI_IRQn EXTI2_IRQn
 #define Connect_Led_Pin GPIO_PIN_12
 #define Connect_Led_GPIO_Port GPIOB
 #define Transfer_Led_Pin GPIO_PIN_13
@@ -76,6 +78,7 @@ void Error_Handler(void);
 #define LORA_NSS_GPIO_Port GPIOA
 #define Button3_Pin GPIO_PIN_3
 #define Button3_GPIO_Port GPIOB
+#define Button3_EXTI_IRQn EXTI3_IRQn
 
 /* USER CODE BEGIN Private defines */
 

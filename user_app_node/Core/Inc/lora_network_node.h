@@ -11,7 +11,9 @@
 #include "bsp_lora.h"
 
 
-
+void lora_network_irq_handle();
+void lora_network_init();
+void lora_network_process();
 
 
 #endif /* INC_LORA_NETWORK_NODE_H_ */

@@ -1,0 +1,6 @@
+../Core/Src/bsp_sim.c:18:6:bsp_sim_transmit	1
+../Core/Src/bsp_sim.c:24:9:bsp_sim_init	17
+../Core/Src/bsp_sim.c:77:9:bsp_sim_init_mqtt	13
+../Core/Src/bsp_sim.c:123:9:bsp_sim_sub	4
+../Core/Src/bsp_sim.c:143:9:bsp_sim_unsub	4
+../Core/Src/bsp_sim.c:164:9:bsp_sim_pub	12

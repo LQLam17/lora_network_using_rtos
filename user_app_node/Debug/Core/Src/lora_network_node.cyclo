@@ -1,5 +1,6 @@
-../Core/Src/lora_network_node.c:33:6:lora_network_send_warning	13
-../Core/Src/lora_network_node.c:85:6:lora_network_send_response	11
-../Core/Src/lora_network_node.c:126:6:lora_network_ack_cmd_handle	3
-../Core/Src/lora_network_node.c:140:6:lora_network_irq_handle	12
-../Core/Src/lora_network_node.c:180:6:lora_network_process	5
+../Core/Src/lora_network_node.c:34:6:lora_network_init	1
+../Core/Src/lora_network_node.c:41:6:lora_network_send_warning	13
+../Core/Src/lora_network_node.c:93:6:lora_network_send_response	10
+../Core/Src/lora_network_node.c:134:6:lora_network_ack_cmd_handle	3
+../Core/Src/lora_network_node.c:148:6:lora_network_irq_handle	15
+../Core/Src/lora_network_node.c:203:6:lora_network_process	5

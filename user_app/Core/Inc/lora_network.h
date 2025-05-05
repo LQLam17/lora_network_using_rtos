@@ -28,17 +28,32 @@
 /* number of last send buffers to used */
 #define NUMBER_OF_LAST_LORA_SEND_PACKET 3
 
-#define SEND_REQUEST_TIME_PERIOD 15000
+#define SEND_REQUEST_TIME_PERIOD 30000
 
 #define TTL_OF_PACKET 3
 
 /* command received from pc */
+/* data frame between stm32 and pc:
+	| length | cmd    | node's id  | data |
+*/
+typedef struct usb_data_frame_s{
+	uint8_t len;
+	uint8_t cmd;
+	uint8_t node_id;
+	uint8_t data[40];
+}usb_data_frame_t;
+
+
+
 enum pc_cmd{
 	PC_CMD_CONNECT_TO_ALL_NODES = 0,
 	PC_CMD_CONNECT_TO_SPECIFIC_NODE,
 	PC_CMD_DISCONNECT_TO_ALL_NODES,
 	PC_CMD_DISCONNECT_TO_SPECIFIC_NODE,
 	PC_CMD_INITIALISE_NODE_QUANTITY,
+	PC_CMD_ACK,
+	PC_CMD_RESPONSE_CONNECTED_NODE_QUANTITY,
+	PC_CMD_SEND_NODE_DATA,
 };
 
 /* the data frame between stm32 and esp32:
@@ -79,6 +94,8 @@ typedef enum connection_task_notification_cmd_e{
 	ACK,
 	NAK,
 	TIMEOUT,
+	PC_SEND_CONNECTED_NODE_QUANTITY,
+	PC_SEND_NODE_DATA,
 }connection_task_notification_cmd_t;
 
 enum software_timer_id{
@@ -90,8 +107,15 @@ enum software_timer_id{
 
 typedef struct connection_task_notification_value_s{
 	connection_task_notification_cmd_t cmd;
-	uint8_t value;
+	uint8_t node_id;
+	uint8_t packet_id;
 }connection_task_notification_value_t;
+
+
+typedef struct pc_send_queue_s{
+	connection_task_notification_cmd_t NotificationValue;
+	usb_data_frame_t usb_data;
+}pc_send_queue_t;
 
 void lora_network_init(uint8_t node_quantity);
 
@@ -100,5 +124,7 @@ void lora_network_increase_tickcount();
 void lora_network_send_request_scheduler();
 
 void pc_user_cmd_handle(uint8_t *test_buffer);
+
+void lora_network_timer_handle();
 
 #endif
